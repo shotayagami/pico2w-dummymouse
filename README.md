@@ -74,4 +74,6 @@ Open the Pico's USB serial port at **115200 baud, 8 data bits, no parity, 1 stop
 
 ## Licensing
 
-This repository does not yet include a license for the project-specific code. Public visibility on GitHub does not by itself grant permission to reuse it. The Pico SDK and BTstack have separate terms; the BTstack version used by the Pico SDK is free for non-commercial use, and commercial use requires a separate license. See the [Pico SDK license](https://github.com/raspberrypi/pico-sdk/blob/2.2.0/LICENSE.TXT) and [BTstack license](https://github.com/bluekitchen/btstack/blob/master/LICENSE).
+The project-specific code, documentation, and configuration in this repository are dedicated to the public domain under **CC0 1.0 Universal**, except for third-party components. See [LICENSE](LICENSE) and the [CC0 legal code](https://creativecommons.org/publicdomain/zero/1.0/legalcode.en).
+
+The Pico SDK and BTstack are separate third-party dependencies and are not relicensed by CC0. The BTstack version used by the Pico SDK is free for non-commercial use; commercial use requires a separate license. See the [Pico SDK license](https://github.com/raspberrypi/pico-sdk/blob/2.2.0/LICENSE.TXT) and [BTstack license](https://github.com/bluekitchen/btstack/blob/master/LICENSE).

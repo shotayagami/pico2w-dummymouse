@@ -74,4 +74,6 @@ PicoのUSBシリアルポートを **115200 baud、8データビット、パリ�
 
 ## ライセンス
 
-このリポジトリには、プロジェクト固有コードのライセンスはまだ設定されていません。GitHubで公開しても、それだけで再利用の許可が与えられるわけではありません。Pico SDKとBTstackにはそれぞれ別の利用条件があります。Pico SDKに含まれるBTstackは非商用利用向けで、商用利用には別途ライセンスが必要です。[Pico SDKのライセンス](https://github.com/raspberrypi/pico-sdk/blob/2.2.0/LICENSE.TXT)と[BTstackのライセンス](https://github.com/bluekitchen/btstack/blob/master/LICENSE)を確認してください。
+このリポジトリ内のプロジェクト独自のコード、文書、設定ファイルは、第三者コンポーネントを除き **CC0 1.0 Universal** でパブリックドメインに提供します。詳細は[LICENSE](LICENSE)と[CC0の法的条文](https://creativecommons.org/publicdomain/zero/1.0/legalcode.en)を参照してください。
+
+Pico SDKとBTstackは別の第三者依存物であり、CC0の対象ではありません。Pico SDKに含まれるBTstackは非商用利用向けで、商用利用には別途ライセンスが必要です。[Pico SDKのライセンス](https://github.com/raspberrypi/pico-sdk/blob/2.2.0/LICENSE.TXT)と[BTstackのライセンス](https://github.com/bluekitchen/btstack/blob/master/LICENSE)を確認してください。
