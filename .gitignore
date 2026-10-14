@@ -1,0 +1,8 @@
+# CMake generated files and build outputs
+/build/
+/build-*/
+/cmake-build-*/
+*.elf
+*.bin
+*.hex
+*.uf2

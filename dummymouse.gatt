@@ -1,0 +1,10 @@
+// BLE GATT database for the DummyMouse HID over GATT device.
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "DummyMouse"
+CHARACTERISTIC, GAP_APPEARANCE, READ, C2 03
+
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+
+#import <device_information_service.gatt>
+#import <hids.gatt>
