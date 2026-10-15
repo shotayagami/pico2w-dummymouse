@@ -6,3 +6,4 @@
 *.bin
 *.hex
 *.uf2
+/.vscode/
