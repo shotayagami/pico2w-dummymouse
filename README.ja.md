@@ -41,6 +41,7 @@ LED表示は、未接続では消灯、BLE接続中でHID通知待ちでは速�
 - 書き込み用のUSBデータケーブル（シリアルログ取得にも使用）
 - Bluetooth Low Energyに対応したPC
 - Raspberry Pi Pico SDK 2.2.0、CMake、Ninja、Python 3、Git、Arm GNU Toolchain
+- Rust 1.85以降と`thumbv8m.main-none-eabi`ターゲット（Rust版ビルド時）
 
 このプロジェクトはPico SDKに含まれるBTstackを使用します。SDKのセットアップ詳細は[Raspberry Pi Pico C/C++ SDKドキュメント](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf)を参照してください。
 
@@ -52,7 +53,7 @@ LED表示は、未接続では消灯、BLE接続中でHID通知待ちでは速�
 git clone --branch 2.2.0 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git C:\pico\pico-sdk
 ```
 
-CMake、Ninja、Python 3、Git、Arm GNU Toolchainをインストールします。`cmake` と `ninja` にPATHが通っている状態で、次を実行します。
+CMake、Ninja、Python 3、Git、Arm GNU Toolchainをインストールします。`cmake` と `ninja` にPATHが通っている状態で、次を実行します。既定ではC版アプリケーションをビルドします。
 
 ```powershell
 $env:PICO_SDK_PATH = 'C:\pico\pico-sdk'
@@ -64,15 +65,35 @@ cmake -S . -B build -G Ninja `
 cmake --build build
 ```
 
+### Rust版をビルドする場合
+
+rustupでRustをインストールし、Cortex-M33ターゲットを追加してから、別のビルドディレクトリを使います。
+
+```powershell
+rustup target add thumbv8m.main-none-eabi
+$env:PICO_SDK_PATH = 'C:\pico\pico-sdk'
+
+cmake -S . -B build-rust -G Ninja `
+  -DPICO_BOARD=pico2_w `
+  -DDUMMYMOUSE_RUST=ON `
+  -DPICO_TOOLCHAIN_PATH='C:\path\to\arm-none-eabi\bin'
+
+cmake --build build-rust
+```
+
+Rustアプリは`no_std`で動作し、BLE/HIDにはPico SDKのBTstackを使います。SDK初期化とBTstack／GPIO APIへの接続には小さなC境界層を使用します。picotoolが利用できる場合、UF2は`build-rust/dummymouse.uf2`に生成されます。C版とRust版はPico 2 WのCortex-M33向けに互換性のある設定でビルドされます。
+
 `PICO_TOOLCHAIN_PATH` には `arm-none-eabi-gcc.exe` がある `bin` ディレクトリを指定します。ツールチェーンがCMakeから見つかる場合は、このオプションを省略できます。UF2は `build/dummymouse.uf2` に生成されます。
 
-間隔は `-DDUMMYMOUSE_REPORT_INTERVAL_MS=<ミリ秒>` で変更できます。たとえば診断用に15秒間隔にする場合は `-DDUMMYMOUSE_REPORT_INTERVAL_MS=15000` を指定します。既定値は60,000ミリ秒です。
+レポート間隔は、どちらの版もCMakeの設定時に`-DDUMMYMOUSE_REPORT_INTERVAL_MS=<ミリ秒>`で変更できます。たとえば診断用に15秒間隔にする場合は、設定コマンドに`-DDUMMYMOUSE_REPORT_INTERVAL_MS=15000`を追加します。既定値は60,000ミリ秒です。
 
 ## Picoへ書き込む
 
 1. PicoをUSBから外します。
 2. **BOOTSEL**ボタンを押したままUSBに接続します。
-3. `build/dummymouse.uf2` をマウントされた `RP2350` ドライブへコピーします。
+3. 選んだ版のUF2をマウントされた`RP2350`ドライブへコピーします。
+   - C版：`build/dummymouse.uf2`
+   - Rust版：`build-rust/dummymouse.uf2`
 4. Picoが再起動し、`DummyMouse` としてBLE広告を始めます。
 
 ## PCとペアリングする
@@ -87,7 +108,8 @@ PicoのUSBシリアルポートを **115200 baud、8データビット、パリ�
 
 ## ファイル構成
 
-- `src/main.c`: BLE広告、HIDレポート、タイマー、USBログ、GP15状態LED、GP14停止／再開ボタン
+- `src/main.c`: C版アプリケーション
+- `rust/src/lib.rs`: Rustアプリケーションの状態管理。`src/rust_main.c`はPico SDKおよびBTstackとの境界層
 - `dummymouse.gatt`: GAP、Device Information、HIDサービス
 - `include/btstack_config.h`: このファームウェア用のBTstack設定
 - `pico_sdk_import.cmake`: `PICO_SDK_PATH` または隣接する `pico-sdk` ディレクトリからSDKを探します

@@ -41,6 +41,7 @@ The LED is off while disconnected, blinks quickly (about four times per second) 
 - A USB data cable for programming and optional serial logs
 - A computer with Bluetooth Low Energy support
 - Raspberry Pi Pico SDK 2.2.0, CMake, Ninja, Python 3, Git, and an Arm GNU Toolchain
+- Rust 1.85 or later and the `thumbv8m.main-none-eabi` target (Rust build only)
 
 The project uses BTstack provided by the Pico SDK. See the [Pico SDK documentation](https://datasheets.raspberrypi.com/pico/raspberry-pi-pico-c-sdk.pdf) for SDK setup details.
 
@@ -52,7 +53,7 @@ Clone the Pico SDK with its submodules. For example:
 git clone --branch 2.2.0 --recurse-submodules https://github.com/raspberrypi/pico-sdk.git C:\pico\pico-sdk
 ```
 
-Install CMake, Ninja, Python 3, Git, and the Arm GNU Toolchain. Make sure `cmake` and `ninja` are on `PATH`, then configure and build:
+Install CMake, Ninja, Python 3, Git, and the Arm GNU Toolchain. Make sure `cmake` and `ninja` are on `PATH`. The default build uses the C application:
 
 ```powershell
 $env:PICO_SDK_PATH = 'C:\pico\pico-sdk'
@@ -64,15 +65,35 @@ cmake -S . -B build -G Ninja `
 cmake --build build
 ```
 
+### Build the Rust application instead
+
+Install Rust with rustup, add its Cortex-M33 target, and configure a separate build directory:
+
+```powershell
+rustup target add thumbv8m.main-none-eabi
+$env:PICO_SDK_PATH = 'C:\pico\pico-sdk'
+
+cmake -S . -B build-rust -G Ninja `
+  -DPICO_BOARD=pico2_w `
+  -DDUMMYMOUSE_RUST=ON `
+  -DPICO_TOOLCHAIN_PATH='C:\path\to\arm-none-eabi\bin'
+
+cmake --build build-rust
+```
+
+The Rust application uses `no_std` and Pico SDK's BTstack for BLE/HID. A small C boundary layer initializes the SDK and provides access to BTstack and GPIO APIs. The UF2 image is written to `build-rust/dummymouse.uf2` when picotool is available. The C and Rust toolchains are configured for compatible Pico 2 W Cortex-M33 targets.
+
 Set `PICO_TOOLCHAIN_PATH` to the `bin` directory containing `arm-none-eabi-gcc.exe`. If your toolchain is already discoverable by CMake, you can omit that option. The UF2 image is written to `build/dummymouse.uf2`.
 
-To change the interval, configure with `-DDUMMYMOUSE_REPORT_INTERVAL_MS=<milliseconds>`. For example, use `-DDUMMYMOUSE_REPORT_INTERVAL_MS=15000` for a 15-second diagnostic build. The default is 60,000 ms.
+The report interval can be changed for either build with `-DDUMMYMOUSE_REPORT_INTERVAL_MS=<milliseconds>` at CMake configure time. For example, add `-DDUMMYMOUSE_REPORT_INTERVAL_MS=15000` to the configure command for a 15-second diagnostic build. The default is 60,000 ms.
 
 ## Flash the Pico
 
 1. Unplug the Pico from USB.
 2. Hold the **BOOTSEL** button while connecting it to USB.
-3. Copy `build/dummymouse.uf2` to the mounted `RP2350` drive.
+3. Copy the UF2 for the selected build to the mounted `RP2350` drive:
+   - C build: `build/dummymouse.uf2`
+   - Rust build: `build-rust/dummymouse.uf2`
 4. The Pico reboots and starts advertising as `DummyMouse`.
 
 ## Pair with a computer
@@ -87,7 +108,8 @@ Open the Pico's USB serial port at **115200 baud, 8 data bits, no parity, 1 stop
 
 ## Project layout
 
-- `src/main.c` implements BLE advertising, HID reports, the timer, USB logs, the GP15 status LED, and the GP14 pause/resume button.
+- `src/main.c` is the C application.
+- `rust/src/lib.rs` contains the Rust application state machine; `src/rust_main.c` provides its Pico SDK and BTstack boundary layer.
 - `dummymouse.gatt` defines the GAP, Device Information, and HID services.
 - `include/btstack_config.h` contains the BTstack configuration for this firmware.
 - `pico_sdk_import.cmake` locates the Pico SDK through `PICO_SDK_PATH` or a sibling `pico-sdk` directory.

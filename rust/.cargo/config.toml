@@ -1,0 +1,5 @@
+[build]
+target = "thumbv8m.main-none-eabi"
+
+[target.thumbv8m.main-none-eabi]
+rustflags = ["-C", "target-feature=+crt-static", "-C", "target-cpu=cortex-m33", "-C", "target-feature=+fp-armv8d16sp"]

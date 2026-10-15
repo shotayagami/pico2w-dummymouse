@@ -1,0 +1,15 @@
+[package]
+name = "dummymouse-rust"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+name = "dummymouse_rust"
+crate-type = ["staticlib"]
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = "s"
