@@ -12,8 +12,28 @@ A small Bluetooth Low Energy (BLE) HID mouse for the Raspberry Pi Pico 2 W. It s
 - Accepts Just Works pairing and stores bond data in flash.
 - Supports one active Bluetooth connection at a time.
 - Reports connection, notification, and send status over USB CDC.
+- A button on GP14 pauses and resumes mouse movement while keeping the BLE connection.
+- An external LED on GP15 indicates connection, operation, and pause status.
+- An external pilot LED on GP16 stays on while the firmware is running.
 
 The direction sequence starts at up after a device reboot. It advances only after BTstack accepts a report for sending.
+
+## Status LED and pause/resume button
+
+Power off the Pico 2 W before wiring. GPIO numbers differ from the physical header pin numbers.
+
+| Part | GPIO | Physical pin | Connection |
+|---|---:|---:|---|
+| Status LED | GP15 | 20 | GP15 → 330 Ω resistor → LED anode (long leg); connect the cathode (short leg) to GND on physical pin 18 |
+| Momentary normally-open button | GP14 | 19 | Connect between GP14 and GND on physical pin 18 |
+| Pilot LED | GP16 | 21 | GP16 → 330 Ω resistor → LED anode (long leg); connect the cathode (short leg) to GND on physical pin 23 |
+| Common ground | — | 18 | Shared by the LED and button |
+
+Connect pilot LED ground (physical pin 23) to the same common ground as the status LED and button (physical pin 18). Use a 330 Ω series resistor for each LED. The pilot LED stays on even while mouse movement is paused.
+
+The button uses the internal pull-up, so no external resistor is needed. Each press toggles pause/resume. The status LED turns off while paused. Resuming restarts the 60-second delay when HID notifications are enabled. The device starts active after power-up and does not persist the paused state.
+
+The LED is off while disconnected, blinks quickly (about four times per second) while connected and waiting for HID notifications, blinks slowly (one short pulse every two seconds) while operating, and is off while paused.
 
 ## Hardware and software
 
@@ -67,7 +87,7 @@ Open the Pico's USB serial port at **115200 baud, 8 data bits, no parity, 1 stop
 
 ## Project layout
 
-- `src/main.c` implements BLE advertising, HID reports, the timer, and USB logs.
+- `src/main.c` implements BLE advertising, HID reports, the timer, USB logs, the GP15 status LED, and the GP14 pause/resume button.
 - `dummymouse.gatt` defines the GAP, Device Information, and HID services.
 - `include/btstack_config.h` contains the BTstack configuration for this firmware.
 - `pico_sdk_import.cmake` locates the Pico SDK through `PICO_SDK_PATH` or a sibling `pico-sdk` directory.

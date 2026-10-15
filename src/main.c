@@ -11,6 +11,15 @@
 #define REPORT_INTERVAL_MS (60u * 1000u)
 #endif
 
+#define STATUS_LED_PIN 15
+#define CONTROL_BUTTON_PIN 14
+#define PILOT_LED_PIN 16
+#define BUTTON_DEBOUNCE_MS 40u
+#define STATUS_FAST_BLINK_INTERVAL_MS 250u
+#define STATUS_FAST_BLINK_DURATION_MS 125u
+#define STATUS_SLOW_BLINK_INTERVAL_MS 2000u
+#define STATUS_SLOW_BLINK_DURATION_MS 100u
+
 typedef struct {
     int8_t dx;
     int8_t dy;
@@ -32,6 +41,11 @@ static btstack_packet_callback_registration_t sm_event_callback_registration;
 static bool btstack_ready;
 static bool can_send_now;
 static bool mouse_report_pending;
+static bool notifications_enabled;
+static bool mouse_paused;
+static bool button_last_reading;
+static bool button_stable_reading;
+static uint32_t button_last_change_ms;
 
 static const uint8_t advertising_data[] = {
     0x02, BLUETOOTH_DATA_TYPE_FLAGS, 0x06,
@@ -83,12 +97,68 @@ static void start_advertising(void) {
 }
 
 static void schedule_mouse_report(void) {
+    if (mouse_paused || !notifications_enabled || connection_handle == HCI_CON_HANDLE_INVALID) {
+        return;
+    }
     btstack_run_loop_set_timer(&mouse_timer, REPORT_INTERVAL_MS);
     btstack_run_loop_add_timer(&mouse_timer);
 }
 
+static void set_mouse_paused(bool paused) {
+    if (mouse_paused == paused) {
+        return;
+    }
+
+    mouse_paused = paused;
+    mouse_report_pending = false;
+    can_send_now = false;
+    btstack_run_loop_remove_timer(&mouse_timer);
+
+    if (mouse_paused) {
+        printf("Mouse movement paused.\n");
+    } else {
+        printf("Mouse movement resumed.\n");
+        schedule_mouse_report();
+    }
+}
+
+static void poll_control_button(void) {
+    const uint32_t now = to_ms_since_boot(get_absolute_time());
+    const bool reading = gpio_get(CONTROL_BUTTON_PIN) == 0;
+
+    if (reading != button_last_reading) {
+        button_last_reading = reading;
+        button_last_change_ms = now;
+    }
+
+    if ((uint32_t)(now - button_last_change_ms) >= BUTTON_DEBOUNCE_MS &&
+        button_stable_reading != button_last_reading) {
+        button_stable_reading = button_last_reading;
+        if (button_stable_reading) {
+            set_mouse_paused(!mouse_paused);
+        }
+    }
+}
+
+static void update_status_led(void) {
+    const uint32_t now = to_ms_since_boot(get_absolute_time());
+    bool led_on = false;
+
+    if (!mouse_paused && connection_handle != HCI_CON_HANDLE_INVALID) {
+        if (notifications_enabled) {
+            led_on = (now % STATUS_SLOW_BLINK_INTERVAL_MS) < STATUS_SLOW_BLINK_DURATION_MS;
+        } else {
+            led_on = (now % STATUS_FAST_BLINK_INTERVAL_MS) < STATUS_FAST_BLINK_DURATION_MS;
+        }
+    }
+    gpio_put(STATUS_LED_PIN, led_on);
+}
+
 static void mouse_timer_handler(btstack_timer_source_t *timer) {
     (void)timer;
+    if (mouse_paused || !notifications_enabled) {
+        return;
+    }
     if (connection_handle == HCI_CON_HANDLE_INVALID) {
         printf("Mouse timer fired without an active connection.\n");
         return;
@@ -99,7 +169,7 @@ static void mouse_timer_handler(btstack_timer_source_t *timer) {
 }
 
 static void send_mouse_report_if_ready(void) {
-    if (!can_send_now || !mouse_report_pending ||
+    if (mouse_paused || !can_send_now || !mouse_report_pending ||
         connection_handle == HCI_CON_HANDLE_INVALID) {
         return;
     }
@@ -147,6 +217,7 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
         case HCI_EVENT_DISCONNECTION_COMPLETE:
             btstack_run_loop_remove_timer(&mouse_timer);
             connection_handle = HCI_CON_HANDLE_INVALID;
+            notifications_enabled = false;
             can_send_now = false;
             mouse_report_pending = false;
             start_advertising();
@@ -159,9 +230,11 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
                     connection_handle = hids_subevent_input_report_enable_get_con_handle(packet);
                     if (hids_subevent_input_report_enable_get_enable(packet)) {
                         printf("HID input notifications enabled.\n");
+                        notifications_enabled = true;
                         schedule_mouse_report();
                     } else {
                         printf("HID input notifications disabled.\n");
+                        notifications_enabled = false;
                         btstack_run_loop_remove_timer(&mouse_timer);
                         mouse_report_pending = false;
                         can_send_now = false;
@@ -195,8 +268,21 @@ static void packet_handler(uint8_t packet_type, uint16_t channel,
 
 int main(void) {
     stdio_init_all();
+    gpio_init(PILOT_LED_PIN);
+    gpio_set_dir(PILOT_LED_PIN, GPIO_OUT);
+    gpio_put(PILOT_LED_PIN, true);
     sleep_ms(1500);
     printf("Starting DummyMouse on Pico 2 W.\n");
+
+    gpio_init(STATUS_LED_PIN);
+    gpio_set_dir(STATUS_LED_PIN, GPIO_OUT);
+    gpio_put(STATUS_LED_PIN, false);
+    gpio_init(CONTROL_BUTTON_PIN);
+    gpio_set_dir(CONTROL_BUTTON_PIN, GPIO_IN);
+    gpio_pull_up(CONTROL_BUTTON_PIN);
+    button_last_reading = gpio_get(CONTROL_BUTTON_PIN) == 0;
+    button_stable_reading = button_last_reading;
+    button_last_change_ms = to_ms_since_boot(get_absolute_time());
 
     if (cyw43_arch_init()) {
         printf("CYW43 initialization failed.\n");
@@ -223,6 +309,8 @@ int main(void) {
 
     while (true) {
         cyw43_arch_poll();
+        poll_control_button();
+        update_status_led();
         tight_loop_contents();
     }
 }
